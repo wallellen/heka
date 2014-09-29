@@ -83,7 +83,7 @@ func (o *ElasticSearchOutput) Init(config interface{}) (err error) {
 		switch strings.ToLower(serverUrl.Scheme) {
 		case "http", "https":
 			o.bulkIndexer = NewHttpBulkIndexer(strings.ToLower(serverUrl.Scheme), serverUrl.Host,
-				o.flushCount, o.http_timeout)
+				o.flushCount, o.http_timeout, serverUrl.User)
 		case "udp":
 			o.bulkIndexer = NewUDPBulkIndexer(serverUrl.Host, o.flushCount)
 		}
@@ -193,6 +193,8 @@ type HttpBulkIndexer struct {
 	Protocol string
 	// Host name and port number (default to "localhost:9200").
 	Domain string
+	// Basic auth username and password
+	User *url.Userinfo
 	// Maximum number of documents.
 	MaxCount int
 	// Internal HTTP Client.
@@ -200,7 +202,7 @@ type HttpBulkIndexer struct {
 }
 
 func NewHttpBulkIndexer(protocol string, domain string, maxCount int,
-	httpTimeout uint32) *HttpBulkIndexer {
+	httpTimeout uint32, user *url.Userinfo) *HttpBulkIndexer {
 
 	client := &http.Client{
 		Timeout: time.Duration(httpTimeout),
@@ -209,6 +211,7 @@ func NewHttpBulkIndexer(protocol string, domain string, maxCount int,
 		Protocol: protocol,
 		Domain:   domain,
 		MaxCount: maxCount,
+		User:     user,
 		client:   client,
 	}
 }
@@ -227,6 +230,10 @@ func (h *HttpBulkIndexer) Index(body []byte) error {
 	request, err := http.NewRequest("POST", url, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("can't create bulk request: %s", err.Error())
+	}
+	if h.User != nil {
+		password, _ := h.User.Password()
+		request.SetBasicAuth(h.User.Username(), password)
 	}
 	request.Header.Add("Accept", "application/json")
 	response, err := h.client.Do(request)
