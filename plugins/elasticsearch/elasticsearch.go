@@ -17,6 +17,7 @@ package elasticsearch
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	. "github.com/mozilla-services/heka/pipeline"
@@ -204,8 +205,13 @@ type HttpBulkIndexer struct {
 func NewHttpBulkIndexer(protocol string, domain string, maxCount int,
 	httpTimeout uint32, user *url.Userinfo) *HttpBulkIndexer {
 
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
 	client := &http.Client{
-		Timeout: time.Duration(httpTimeout),
+		Timeout:   time.Duration(httpTimeout),
+		Transport: transport,
 	}
 	return &HttpBulkIndexer{
 		Protocol: protocol,
